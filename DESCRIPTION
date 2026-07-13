@@ -1,0 +1,36 @@
+Package: kpe
+Title: Estimating the Value of Personalized Treatment Assignment
+Version: 0.1.0
+Authors@R: c(
+    person("Emma", "Brunskill", email = "ebrun@cs.stanford.edu",
+           role = c("aut", "cre"), comment = c(ORCID = "0000-0002-2200-0019")),
+    person("Zhaoqi", "Li", role = "aut"))
+Description: Point estimate, confidence interval, and one-sided p-value for
+    the personalization effect -- the expected outcome difference between
+    the best personalized policy and the best single treatment applied to
+    everyone. Implements the K-Fold Personalization Estimator of
+    Li and Brunskill (2026). Supports binary and multi-arm discrete
+    treatments, pluggable reward, contextual-policy, and best-arm
+    learners, and is robust to mild misspecification of the plug-in
+    models.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.1)
+Imports:
+    stats,
+    future,
+    future.apply,
+    parallelly
+Suggests:
+    ranger,
+    policytree,
+    grf,
+    glmnet,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+URL: https://github.com/StanfordAI4HI/kpe-r
+BugReports: https://github.com/StanfordAI4HI/kpe-r/issues
+Config/roxygen2/version: 8.0.0

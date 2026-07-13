@@ -1,0 +1,14 @@
+^\.github$
+^docs$
+^data-raw$
+^pkgdown$
+^_pkgdown\.yml$
+^cran-comments\.md$
+^README\.Rmd$
+^LICENSE\.md$
+^\.Rproj\.user$
+^.*\.Rproj$
+^\.gitignore$
+\.Rhistory$
+^tests/reference$
+^.*\.Rhistory$

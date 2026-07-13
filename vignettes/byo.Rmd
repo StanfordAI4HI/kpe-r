@@ -1,0 +1,132 @@
+---
+title: "User-supplied learners"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{User-supplied learners}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+The `reward_model`, `contextual_policy`, and `best_arm` arguments of
+`kpe()`, `train_eval()`, and `papd()` each accept either a character
+string naming a built-in learner or a user-supplied object that
+implements the required `fit` / `predict` methods.
+
+## Prerequisites
+
+See `vignette("getting-started", package = "kpe")` for installation and the
+full learner/backend table. The runnable example below uses only base-R
+learners (`"linear"`, `"simple"`) plus a user-supplied reward object, so it
+needs no extra packages. The optional `xgboost` snippet near the end requires
+the **`xgboost`** package.
+
+## Built-in strings
+
+| slot                | strings                                                                 |
+|---------------------|-------------------------------------------------------------------------|
+| `reward_model`      | `"random_forest"`, `"linear"`, `"ridge"`, `"lasso"`                    |
+| `contextual_policy` | `"policy_tree"`, `"policy_forest"`, `"linear"`                          |
+| `best_arm`          | `"ips"`, `"simple"`                                                    |
+
+## User-supplied-object contracts
+
+A user-supplied learner must be an R `list` with `fit` and `predict`
+elements matching the following signatures.
+
+```r
+# Reward model
+list(
+  fit     = function(X, y) { ... ; invisible(NULL) },
+  predict = function(X) numeric_vector
+)
+# X is an (n, d + 1) numeric matrix whose last column is the observed
+# action. predict returns a length-n numeric vector of predicted
+# outcomes.
+
+# Contextual policy
+list(
+  fit     = function(X, A, Y, n_actions) { ... ; invisible(NULL) },
+  predict = function(X) integer_vector
+)
+# predict returns a length-n integer vector of actions in
+# {0, ..., n_actions - 1}.
+
+# Best-arm (non-contextual)
+list(
+  fit     = function(A, Y, propensities, n_actions) { ... ; invisible(NULL) },
+  predict = function() integer_scalar
+)
+# predict returns a single integer action in {0, ..., n_actions - 1}.
+```
+
+The same `list` instance is reused across folds, so `fit` should reset
+any state it needs from the training arguments — for example via a
+closure that assigns into its parent environment with `<<-`.
+
+## Example: a user-supplied reward model
+
+The learner below records the mean of `y` at fit time and returns it
+as the reward prediction at predict time. It has no statistical value;
+it is the minimal object that satisfies the reward-model contract.
+
+```{r setup, message = FALSE}
+library(kpe)
+```
+
+```{r byo-reward}
+byo_reward <- local({
+  mu <- NULL
+  list(
+    fit     = function(X, y) { mu <<- mean(y); invisible(NULL) },
+    predict = function(X) rep(mu, nrow(as.matrix(X)))
+  )
+})
+
+set.seed(0)
+n <- 300
+X <- matrix(runif(n * 2, -1, 1), ncol = 2)
+A <- rbinom(n, 1, 0.5)
+Y <- ifelse(X[, 1] >= 0, A, 0.5 * (1 - A)) + rnorm(n, sd = 0.3)
+
+fit <- kpe(X, A, Y, propensity = 0.5,
+           n_shuffles = 4, n_folds = 6,
+           reward_model      = byo_reward,
+           contextual_policy = "linear",
+           best_arm          = "simple",
+           seed = 0)
+print(fit)
+```
+
+## Example: wrapping an external regressor as a reward model
+
+Any regressor that exposes `fit(X, y)` and `predict(X)` can be adapted
+by assigning its fitted state in the closure and calling `predict` at
+prediction time. The snippet below wraps `xgboost::xgboost` (not a
+hard dependency of `kpe`; load separately if required).
+
+```r
+library(xgboost)
+
+byo_xgb <- local({
+  model <- NULL
+  list(
+    fit = function(X, y) {
+      model <<- xgboost::xgboost(data = as.matrix(X), label = y,
+                                 nrounds = 50, verbose = 0)
+      invisible(NULL)
+    },
+    predict = function(X) {
+      as.numeric(stats::predict(model, as.matrix(X)))
+    }
+  )
+})
+
+fit <- kpe(X, A, Y, propensity = 0.5,
+           reward_model = byo_xgb, seed = 0)
+```
+
+The same construction applies to a user-supplied `contextual_policy`
+(providing `fit(X, A, Y, n_actions)` and `predict(X)` returning
+integer actions in `{0, ..., n_actions - 1}`) or a user-supplied
+`best_arm` (providing `fit(A, Y, propensities, n_actions)` and
+`predict()` returning a single integer action).

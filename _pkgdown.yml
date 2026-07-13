@@ -1,0 +1,91 @@
+url: https://stanfordai4hi.github.io/kpe-r/
+
+home:
+  title: "kpe-r: confidence intervals for the value of personalization"
+  description: >-
+    kpe-r is the R implementation (the Python version is kpe-py). Confidence
+    intervals and hypothesis tests for the value of personalizing treatment
+    decisions (Li & Brunskill, 2026). Installed from GitHub; loads as
+    `library(kpe)`.
+
+authors:
+  Emma Brunskill:
+    href: https://stanford.edu/~ebrun/
+  Zhaoqi Li:
+    href: https://www.lizhaoqi.com/
+
+template:
+  bootstrap: 5
+  bslib:
+    primary: "#2E7D32"
+    border-radius: 0.5rem
+  opengraph:
+    twitter:
+      creator: "@ebrun"
+      card: summary_large_image
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, news]
+    right: [search, github]
+  components:
+    intro:
+      text: Getting started
+      href: articles/getting-started.html
+    articles:
+      text: Vignettes
+      menu:
+        - text: JobCorps
+          href: articles/jobcorps.html
+        - text: Joke
+          href: articles/joke.html
+        - text: "---"
+        - text: Methods
+          href: articles/methods.html
+        - text: Baselines
+          href: articles/baselines.html
+        - text: "User-supplied learners"
+          href: articles/byo.html
+    github:
+      icon: fa-github
+      href: https://github.com/StanfordAI4HI/kpe-r
+      aria-label: GitHub
+
+reference:
+  - title: "Core estimators"
+    desc: >-
+      The three public entry points. All share the same signature and
+      return a `"kpe"` S3 object.
+    contents:
+      - kpe
+      - train_eval
+      - papd
+  - title: "S3 methods"
+    desc: "Generics dispatched on the `\"kpe\"` class."
+    contents:
+      - print.kpe
+      - summary.kpe
+      - confint.kpe
+      - coef.kpe
+
+articles:
+  - title: "Tutorials"
+    navbar: ~
+    contents:
+      - getting-started
+      - jobcorps
+      - joke
+  - title: "Concepts"
+    contents:
+      - methods
+      - baselines
+      - byo
+
+footer:
+  structure:
+    left: [developed_by, built_with]
+    right: [paper]
+  components:
+    paper: >-
+      Li & Brunskill (2026), *A Statistical Test for the Benefits of
+      Personalizing Interventions.*

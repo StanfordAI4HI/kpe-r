@@ -1,0 +1,167 @@
+# kpe-r — K-Fold Personalization Estimator
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+**kpe-r** is the R implementation (the Python version is
+[**kpe-py**](https://github.com/StanfordAI4HI/kpe-py)); the package installs and
+loads as `kpe` (`library(kpe)`).
+
+*Released under the [MIT License](LICENSE.md) — provided "as is", without warranty
+of any kind; the authors are not liable for any claim or damages.*
+
+An R package for estimating the personalization effect — the
+difference in expected outcome between the best personalized policy
+and the best single treatment applied to every individual — from
+observational or experimental data.
+
+References:
+
+* Zhaoqi Li, Emma Brunskill, A statistical test for the benefits of personalizing interventions. Science 393, eaeb9506 (2026). DOI: [10.1126/science.aeb9506](https://doi.org/10.1126/science.aeb9506)
+* 2-fold variant detailed [here](https://drive.google.com/file/d/1mmFIdJEQCKhO9Z2flWloWx3ZRQB4P3r4/view)
+
+## Install
+
+From GitHub — not yet on CRAN (planned):
+
+```r
+# install.packages("pak")
+pak::pak("StanfordAI4HI/kpe-r")
+# or: remotes::install_github("StanfordAI4HI/kpe-r")
+```
+
+The learner backends live in `Suggests.` We recommend installing 
+the ones specific to your call:
+`ranger` (`reward_model = "random_forest"`), `glmnet` (`"lasso"`/`"ridge"`),
+`policytree` (`contextual_policy = "policy_tree"`), and `grf`
+(`"policy_forest"`). The JobCorps vignette needs `ranger` + `policytree`; the
+Joke vignette needs `glmnet`:
+
+```r
+install.packages(c("ranger", "policytree", "grf", "glmnet"))
+```
+
+## Example usage
+
+```r
+library(kpe)
+
+set.seed(0)
+n <- 400
+X <- matrix(runif(n * 2, -1, 1), ncol = 2)
+A <- rbinom(n, 1, 0.5)
+Y <- ifelse(X[, 1] >= 0, A, 0.5 * (1 - A)) + rnorm(n, sd = 0.3)
+
+fit <- kpe(X, A, Y, propensity = 0.5,
+           n_shuffles = 30, n_folds = 6,
+           contextual_policy = "linear",
+           best_arm          = "simple",
+           reward_model      = "linear",
+           seed = 0)
+print(fit)
+```
+
+See `vignette("getting-started", package = "kpe")` for a walk-through
+and `vignette("jobcorps")`, `vignette("joke")` for dataset-specific
+analyses.
+
+## Estimators
+
+The package provides three estimators. All share the same argument
+signature and return an S3 object of class `"kpe"` with `print`,
+`summary`, `confint`, and `coef` methods. Each returned object
+contains: `psi`, `std_error`, `confidence_interval`, `p_value`,
+`psi_per_shuffle`, `sigma_per_shuffle`, `p_value_per_shuffle`,
+`cauchy_p_value`, `policy_stability`, `overall_stability`,
+`predicted_policy_actions`, `predicted_overall_actions`, `method`,
+`n_samples`, `n_shuffles`, `n_folds`.
+
+### `kpe(X, A, Y, propensity, ...)`
+
+**Inputs.** `X`: `n × d` numeric matrix or data frame of covariates.
+`A`: length-`n` integer vector of observed actions in `{0, ..., K-1}`
+(factors are coerced). `Y`: length-`n` numeric vector of observed
+outcomes. `propensity`: scalar, length-`n` vector, or `n × K` matrix
+giving `p(A | X)` for the observed action; required when `is_rct=TRUE`
+(the default) and ignored when `is_rct=FALSE` (the propensity is then
+fit on the nuisance folds). Additional arguments: `n_shuffles`,
+`n_folds`, `n_nuisance_folds`, `is_rct`, `contextual_policy`,
+`best_arm`, `reward_model`, `propensity_model`, `policy_features`,
+`n_cores`, `seed`, `verbose`.
+
+**Output.** An S3 list of class `"kpe"`.
+
+**Computation.** The K-Fold Personalization Estimator of Li and
+Brunskill (2026), in the kpe2 shared-nuisance variant: for each of
+`n_shuffles` random partitions of the data into `n_folds` folds, **all**
+nuisances — the reward model, contextual policy, best-arm learner, and
+(when `is_rct=FALSE`) the propensity — are fit on a shared set of
+`n_nuisance_folds` folds, and the AIPW influence function is
+evaluated on the held-out block of the remaining
+`n_folds - n_nuisance_folds` folds. The blocks tile the folds without
+overlap, so each sample is evaluated exactly once per shuffle. The
+default `n_nuisance_folds = n_folds - 1` gives leave-one-fold-out: with
+`n_folds = 6`, every nuisance is fit on 5/6 of the data and evaluated on
+the held-out 1/6, rotated six times. The Algorithm-1 variance
+decomposition combines the per-shuffle `(psi_hat, sigma_hat)` pairs into
+a point estimate, standard error, one-sided upper-tail t-test p-value,
+and 95% Wald confidence interval.
+
+### `train_eval(X, A, Y, propensity, ...)`
+
+**Inputs.** Identical to `kpe()`. The `n_folds` argument is accepted
+for symmetry and is ignored.
+
+**Output.** An S3 list of class `"kpe"`. `policy_stability` and
+`overall_stability` are returned as `NaN` because each shuffle
+evaluates a different randomly-chosen held-out half, so per-sample
+policy agreement across shuffles is not well-defined.
+
+**Computation.** A simple baseline. On each of `n_shuffles` random 50/50 splits of the 
+data, the reward, contextual-policy, and best-arm learners are
+estimated on one half and the AIPW influence function of Eq. S17 is
+evaluated on the other half. The Algorithm-1 variance decomposition
+is applied to the per-shuffle `(psi_hat, sigma_hat)` pairs using
+`n / 2` as the effective sample size for the t-test denominator.
+
+### `papd(X, A, Y, propensity, ...)`
+
+**Inputs.** Identical to `kpe()`. The `n_folds` and `reward_model`
+arguments are accepted for symmetry and are ignored; `papd()` always
+uses 3 folds and does not fit a reward model.
+
+**Output.** An S3 list of class `"kpe"`.
+
+**Computation.** Implementation of the Population Average Prescriptive
+Difference of Imai and Li (2023), specialized to the case where one
+policy class is restricted to providing a single best arm for all
+individuals, as described in Li and Brunskill (Science, 2026). On each
+of `n_shuffles` random 3-fold partitions, the contextual policy and
+best-arm learner are trained on two folds and the test-fold-centered
+inverse-propensity statistic
+
+```
+psi_i = ( 1{A_i = pi(X_i), pi_0 != pi(X_i)}
+        - 1{A_i = pi_0,     pi_0 != pi(X_i)} ) / p(A_i | X_i)
+        * ( Y_i - mean(Y_test) )
+```
+
+is computed on the held-out fold. The Algorithm-1 variance
+decomposition is applied to the per-shuffle
+`(psi_hat, sigma_hat)` pairs.
+
+## Sibling Python package
+
+A Python implementation with matching argument names and return
+fields is available at
+[`StanfordAI4HI/kpe-py`](https://github.com/StanfordAI4HI/kpe-py).
+
+## Citation
+
+A formal citation is being finalized. For now, please cite this repository by its URL. A companion paper is forthcoming.
+
+## License
+
+Released under the **MIT License** (see [`LICENSE.md`](LICENSE.md)) — provided
+"as is", without warranty of any kind; the authors are not liable for any claim
+or damages.
