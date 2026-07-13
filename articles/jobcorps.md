@@ -1,0 +1,143 @@
+# JobCorps
+
+The code assumes that you have created a KPE_DATA_DIR env variable which
+points to the directory you are storing the provided data file:
+jobcorps_cleaned_nonan_full_with_offset.csv.
+
+This dataset is a semi-synthetic dataset built from the JobCorps dataset
+on job training (n = 10 214; binary treatment; outcome = week-4-year
+earnings rate, denominated in dollars per week).
+
+See details here:
+<https://datadryad.org/dataset/doi:10.5061/dryad.bg79cnpp7>
+
+## References:
+
+- Zhaoqi Li, Emma Brunskill, A statistical test for the benefits of
+  personalizing interventions. Science 393, eaeb9506 (2026). DOI:
+  [10.1126/science.aeb9506](https://doi.org/10.1126/science.aeb9506)
+- 2-fold variant detailed
+  [here](https://drive.google.com/file/d/1mmFIdJEQCKhO9Z2flWloWx3ZRQB4P3r4/view)
+- Schochet, Peter Z., Burghardt, John, and McConnell, Sheena.
+  Replication data for: Does Job Corps Work? Impact Findings from the
+  National Job Corps Study. Nashville, TN: American Economic Association
+  \[publisher\], 2008. Ann Arbor, MI: Inter-university Consortium for
+  Political and Social Research \[distributor\], 2019-10-12.
+  <https://doi.org/10.3886/E113269V1>
+
+## Prerequisites
+
+This vignette assumes `kpe` is installed with the learner backends its
+call uses. It calls `reward_model = "random_forest"` and
+`contextual_policy = "policy_tree"`, which require the **`ranger`**,
+**`policytree`**, and **`glmnet`** packages. See
+[`vignette("getting-started", package = "kpe")`](https://stanfordai4hi.github.io/kpe-r/articles/getting-started.md)
+for installation and the full learner/backend table.
+
+It also requires the JobCorps CSV and the `KPE_DATA_DIR` environment
+variable pointing to the directory that contains it (see above); the
+code chunks below are skipped when `KPE_DATA_DIR` is unset.
+
+## Setup
+
+``` r
+
+library(kpe)
+
+# One-hot every covariate column (mirrors the OneHotEncoder loop in the
+# Python JobCorps vignette), reading the same cleaned CSV. Produces:
+#   X                : one-hot encoded covariates
+#   A                : 0/1 treatment
+#   Y                : continuous earnings outcome
+#   age_group_index  : 1-based column indices of the AGEGROUP one-hots
+df <- read.csv(file.path(Sys.getenv("KPE_DATA_DIR"),
+                         "jobcorps_cleaned_nonan_full_with_offset.csv"))
+Y <- df$EARNY4
+A <- as.integer(df$TREATMNT)
+
+feature_columns <- setdiff(names(df), c("EARNY4", "TREATMNT"))
+encoded <- list()
+age_group_cols <- character(0)
+for (col in feature_columns) {
+  lv <- sort(unique(df[[col]]))            # sklearn OneHotEncoder sorts categories
+  mm <- outer(df[[col]], lv, `==`) + 0     # full one-hot, no reference level dropped
+  colnames(mm) <- paste0(col, "_", lv)
+  encoded[[col]] <- mm
+  if (col == "AGEGROUP") age_group_cols <- colnames(mm)
+}
+X <- do.call(cbind, encoded)
+X[is.na(X)] <- 0
+age_group_index <- match(age_group_cols, colnames(X))   # 1-based indices
+
+pa_x <- prop.table(table(A))[as.character(A)]
+```
+
+## Run
+
+``` r
+
+result <- kpe(
+  X = X, A = A, Y = Y, propensity = pa_x,
+  n_shuffles        = 100,
+  n_folds           = 6,
+  contextual_policy = "policy_tree",     # alias of research-code 'dr_econml_2'
+  best_arm          = "best_arm_erm",
+  reward_model      = "random_forest",
+  policy_features   = age_group_index,
+  n_cores           = 5,
+  seed              = 0
+)
+summary(result)
+```
+
+## Results
+
+| quantity           | value       |
+|--------------------|-------------|
+| `psi`              | `+13.06538` |
+| `std_error`        | `2.58630`   |
+| t-statistic        | `5.05`      |
+| one-sided p-value  | `2.2e-07`   |
+| `policy_stability` | `1.000`     |
+| best-arm stability | `0.810`     |
+
+The confidence interval excludes zero at the 5% level.
+`policy_stability = 1.000` records that every shuffle agreed on the
+contextual-policy action for every sample: under the default
+leave-one-fold-out scheme the exact `policytree` fit on 5/6 of the data
+is perfectly consistent across shuffles.
+
+Note that relative to the results reported in Li and Brunskill 2026 (see
+their Algorithms 1 and 2), this code base uses a two-fold
+shared-nuisance approach in which every nuisance is trained on 5/6 of
+the data. This improves the point estimate and the stability, but the
+sign and reject-at-0.05 decision are unchanged.
+
+## Baselines on the same inputs
+
+``` r
+
+common <- list(
+  X = X, A = A, Y = Y, propensity = pa_x,
+  n_shuffles        = 100, n_folds = 6,
+  contextual_policy = "policy_tree",
+  best_arm          = "best_arm_erm",
+  reward_model      = "random_forest",
+  policy_features   = age_group_index,
+  n_cores           = 5, seed = 0
+)
+r_trev <- do.call(train_eval, common)
+r_papd <- do.call(papd,       common)
+```
+
+Both baselines return annualized `psi` and `std_error` on the same scale
+as [`kpe()`](https://stanfordai4hi.github.io/kpe-r/reference/kpe.md).
+
+## Notes
+
+- The JobCorps CSV stores earnings in dollars per week. Figure 3
+  multiplies the estimator’s output by 52 for presentation; this
+  vignette reports the annualized scale for direct comparison with the
+  paper.
+- `policy_features = age_group_index` restricts the contextual policy to
+  the AGEGROUP one-hot columns.

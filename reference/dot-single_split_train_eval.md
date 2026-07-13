@@ -1,0 +1,26 @@
+# Per-shuffle TrainEval worker: 50/50 split AIPW on one shuffle seed.
+
+Mirrors \`kpe-py/src/kpe/core/baselines.py::single_split_train_eval\`.
+Each shuffle trains reward/policy/best-arm on a random half of the rows
+and scores the AIPW influence function on the held-out half.
+
+## Usage
+
+``` r
+.single_split_train_eval(
+  inputs,
+  reward_builder,
+  policy_builder,
+  best_arm_builder,
+  seed,
+  order_override = NULL
+)
+```
+
+## Arguments
+
+- order_override:
+
+  Optional 1-based integer vector of row ordering to use instead of the
+  seeded \`sample.int\`; lets the Python-parity test inject the same
+  permutation numpy's default_rng produced.

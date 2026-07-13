@@ -1,0 +1,35 @@
+# Run one kpe2 shared-nuisance cross-fit pass.
+
+Partition the rows into n_folds folds. Tile them into K/b
+non-overlapping evaluation blocks of size b = n_folds -
+n_nuisance_folds. For each block: fit ALL nuisances (reward model,
+contextual policy, best single arm, and – when is_rct = FALSE – the
+propensity p(a\|x)) on the other m = n_nuisance_folds folds, then
+evaluate the AIPW influence on the block. Each sample is evaluated
+exactly once per shuffle. Default n_nuisance_folds = n_folds - 1 gives
+leave-one-fold-out.
+
+## Usage
+
+``` r
+.single_split_kpe(
+  inputs,
+  reward_builder,
+  policy_builder,
+  best_arm_builder,
+  n_folds,
+  seed,
+  n_nuisance_folds = NULL,
+  is_rct = TRUE,
+  propensity_builder = NULL,
+  folds_override = NULL
+)
+```
+
+## Arguments
+
+- folds_override:
+
+  Optional list of length n_folds, each a vector of 1-based row indices.
+  Used by the cross-language parity test to inject sklearn's KFold
+  shuffle so both languages operate on identical folds.

@@ -1,0 +1,14 @@
+pandoc: 3.8.3
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  baselines: baselines.html
+  byo: byo.html
+  getting-started: getting-started.html
+  jobcorps: jobcorps.html
+  joke: joke.html
+  methods: methods.html
+last_built: 2026-07-13T06:38Z
+urls:
+  reference: https://stanfordai4hi.github.io/kpe-r/reference
+  article: https://stanfordai4hi.github.io/kpe-r/articles

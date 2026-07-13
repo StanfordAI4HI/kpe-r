@@ -1,0 +1,126 @@
+# Baselines
+
+``` r
+
+library(kpe)
+```
+
+In addition to
+[`kpe()`](https://stanfordai4hi.github.io/kpe-r/reference/kpe.md), the
+package provides two baseline estimators of the personalization effect:
+[`train_eval()`](https://stanfordai4hi.github.io/kpe-r/reference/train_eval.md)
+and [`papd()`](https://stanfordai4hi.github.io/kpe-r/reference/papd.md).
+
+## Prerequisites
+
+See
+[`vignette("getting-started", package = "kpe")`](https://stanfordai4hi.github.io/kpe-r/articles/getting-started.md)
+for installation and the full learner/backend table. The runnable
+comparison at the end uses only base-R learners (`"linear"`,
+`"simple"`), so it needs no extra packages; the
+`policy_tree`/`random_forest` calls shown for illustration are not
+evaluated, but running them would require **`policytree`**,
+**`ranger`**, and **`glmnet`**.
+
+## `train_eval()`
+
+``` r
+
+res <- train_eval(X, A, Y, propensity,
+                  n_shuffles        = 100,
+                  contextual_policy = "policy_tree",
+                  best_arm          = "ips",
+                  reward_model      = "random_forest",
+                  seed              = 0)
+```
+
+**Inputs.** Identical to
+[`kpe()`](https://stanfordai4hi.github.io/kpe-r/reference/kpe.md). The
+`n_folds` argument is accepted for symmetry and is ignored.
+
+**Output.** An S3 list of class `"kpe"`. `policy_stability` and
+`overall_stability` are returned as `NaN` because each shuffle evaluates
+a different randomly-chosen held-out half, so per-sample policy
+agreement across shuffles is not well-defined.
+
+**Computation.** On each of `n_shuffles` random 50/50 splits of the
+data, the reward, contextual-policy, and best-arm learners are estimated
+on one half and the AIPW influence function of Eq. S17 is evaluated on
+the other half. The Algorithm-1 variance decomposition is applied to the
+per-shuffle `(psi_hat, sigma_hat)` pairs using `n / 2` as the effective
+sample size for the t-test denominator.
+
+## `papd()`
+
+``` r
+
+res <- papd(X, A, Y, propensity,
+            n_shuffles        = 100,
+            contextual_policy = "policy_tree",
+            best_arm          = "ips",
+            seed              = 0)
+```
+
+**Inputs.** Identical to
+[`kpe()`](https://stanfordai4hi.github.io/kpe-r/reference/kpe.md). The
+`n_folds` and `reward_model` arguments are accepted for symmetry and are
+ignored;
+[`papd()`](https://stanfordai4hi.github.io/kpe-r/reference/papd.md)
+always uses 3 folds and does not fit a reward model.
+
+**Output.** An S3 list of class `"kpe"`.
+
+**Computation.** Implementation of the Population Average Prescriptive
+Difference of Imai and Li (2023), specialized to the case where one
+policy class is restricted to providing a single best arm for all
+individuals, as described in Li and Brunskill (2026, Science, 2026). On
+each of `n_shuffles` random 3-fold partitions, the contextual policy and
+best-arm learner are trained on two folds and the test-fold-centered
+inverse-propensity statistic
+
+``` math
+\psi^{\text{PAPD}}_i = \frac{\mathbf{1}\{A = \pi(X), \pi_0 \neq \pi(X)\}
+                              - \mathbf{1}\{A = \pi_0, \pi_0 \neq \pi(X)\}}
+                           {p(A \mid X)}\,(Y_i - \bar Y_{\text{test}})
+```
+
+is computed on the held-out fold. The Algorithm-1 variance decomposition
+is applied to the per-shuffle `(psi_hat, sigma_hat)` pairs.
+
+## Side-by-side comparison on a synthetic dataset
+
+``` r
+
+set.seed(1)
+n <- 400
+X <- matrix(runif(n * 2, -1, 1), ncol = 2)
+A <- rbinom(n, 1, 0.5)
+Y <- ifelse(X[, 1] >= 0, A, 0.5 * (1 - A)) + rnorm(n, sd = 0.3)
+
+common <- list(
+  propensity        = 0.5,
+  n_shuffles        = 10,
+  contextual_policy = "linear",
+  best_arm          = "simple",
+  reward_model      = "linear",
+  seed              = 0
+)
+r_kpe  <- do.call(kpe,        c(list(X = X, A = A, Y = Y), common))
+r_trev <- do.call(train_eval, c(list(X = X, A = A, Y = Y), common))
+r_papd <- do.call(papd,       c(list(X = X, A = A, Y = Y), common))
+
+summary_row <- function(r) {
+  ci <- r$confidence_interval
+  data.frame(method  = r$method,
+             psi     = r$psi,
+             ci_lo   = ci[1],
+             ci_hi   = ci[2],
+             p_value = r$p_value)
+}
+do.call(rbind, lapply(list(r_kpe, r_trev, r_papd), summary_row))
+```
+
+    ##       method       psi     ci_lo     ci_hi      p_value
+    ## 1        kpe 0.1995672 0.1511233 0.2480111 4.053638e-15
+    ## 2 train_eval 0.2009647 0.1306704 0.2712589 3.469744e-08
+    ## 3       papd 0.1919487 0.1441637 0.2397337 1.651229e-14
