@@ -25,6 +25,10 @@ It also requires `RCT_joke_data.csv` and the `KPE_DATA_DIR` environment
 variable pointing to the directory that contains it (see above); the
 code chunks below are skipped when `KPE_DATA_DIR` is unset.
 
+This dataset can be accessed by cloning the repository and looking in
+the “vignettes” directory. git clone
+<https://github.com/StanfordAI4HI/kpe-r.git>
+
 ## Setup
 
 ``` r
