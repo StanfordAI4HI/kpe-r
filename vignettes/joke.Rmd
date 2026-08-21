@@ -81,11 +81,11 @@ leave-one-fold-out cross-fitting (`n_nuisance_folds = n_folds - 1`, so
 | quantity                | value            |
 |-------------------------|------------------|
 | `psi`                   | `0.1692`         |
-| `std_error`             | `0.0224`         |
-| 95% confidence interval | `[0.125, 0.213]` |
+| `std_error`             | `0.0231`         |
+| 95% confidence interval | `[0.124, 0.214]` |
 | z-statistic             | `7.56`           |
-| one-sided p-value       | `2.1e-14`        |
-| `policy_stability`      | `0.273`          |
+| one-sided p-value       | `1.3e-13`        |
+| `policy_stability`      | `0.263`          |
 
 For reference, this  two-fold
 shared-nuisance scheme used here 

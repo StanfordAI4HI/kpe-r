@@ -4,7 +4,7 @@ Version: 0.1.0
 Authors@R: c(
     person("Emma", "Brunskill", email = "ebrun@cs.stanford.edu",
            role = c("aut", "cre"), comment = c(ORCID = "0000-0002-2200-0019")),
-    person("Zhaoqi", "Li", role = "aut"))
+    person("Zhaoqi", "Li", email = "zli9@stanford.edu", role = "aut"))
 Description: Point estimate, confidence interval, and one-sided p-value for
     the personalization effect -- the expected outcome difference between
     the best personalized policy and the best single treatment applied to
@@ -34,3 +34,4 @@ Config/testthat/edition: 3
 URL: https://github.com/StanfordAI4HI/kpe-r
 BugReports: https://github.com/StanfordAI4HI/kpe-r/issues
 Config/roxygen2/version: 8.0.0
+LazyData: true

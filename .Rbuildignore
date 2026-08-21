@@ -12,3 +12,4 @@
 \.Rhistory$
 ^tests/reference$
 ^.*\.Rhistory$
+^CRAN-SUBMISSION$
